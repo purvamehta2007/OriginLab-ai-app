@@ -25,25 +25,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[v0] Admin login attempt for:', email);
 
-    // Get user via admin API
-    const { data: userData, error: getUserError } = await supabase.auth.admin.getUserById(
-      email
-    ).catch(async () => {
-      // If direct lookup fails, try fetching all users and finding by email
-      const { data, error } = await supabase.auth.admin.listUsers();
-      if (error) return { data: null, error };
-      const user = data.users?.find(u => u.email === email);
-      return { data: user, error: null };
-    });
-
-    if (!userData) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    // Create a session for the user
+    // Try standard signin first
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

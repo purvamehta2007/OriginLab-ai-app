@@ -29,14 +29,17 @@ export default function Page() {
     setError(null)
 
     try {
+      console.log('[v0] Starting login for:', email)
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      // If rate limited, use admin API as fallback
-      if (error && error.message.includes('rate limit')) {
-        console.log('[v0] Rate limit detected, using admin API...')
+      // If standard login fails, use admin API as fallback
+      if (error) {
+        console.log('[v0] Standard login failed:', error.message, '- trying admin API...')
+        
         const adminRes = await fetch('/api/auth/admin-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -45,7 +48,7 @@ export default function Page() {
         
         if (!adminRes.ok) {
           const adminError = await adminRes.json()
-          throw new Error(adminError.error || 'Login failed')
+          throw new Error(adminError.error || 'Invalid credentials')
         }
         
         const { session } = await adminRes.json()
@@ -59,10 +62,8 @@ export default function Page() {
         return
       }
       
-      if (error) throw error
-      
       if (data.session) {
-        // Login successful, redirect to home or dashboard
+        console.log('[v0] Login successful')
         router.push('/')
       }
     } catch (error: unknown) {

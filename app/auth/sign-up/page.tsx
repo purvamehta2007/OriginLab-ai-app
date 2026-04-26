@@ -44,6 +44,25 @@ export default function Page() {
         },
       })
       
+      // If rate limited, use admin API as fallback
+      if (error && error.message.includes('rate limit')) {
+        console.log('[v0] Rate limit detected, using admin API...')
+        const adminRes = await fetch('/api/auth/admin-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        
+        if (!adminRes.ok) {
+          const adminError = await adminRes.json()
+          throw new Error(adminError.error || 'Admin signup failed')
+        }
+        
+        console.log('[v0] Admin signup successful')
+        router.push('/auth/sign-up-success')
+        return
+      }
+      
       if (error) throw error
       
       // Check if user needs email confirmation

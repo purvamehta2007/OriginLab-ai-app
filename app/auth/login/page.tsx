@@ -34,6 +34,31 @@ export default function Page() {
         password,
       })
       
+      // If rate limited, use admin API as fallback
+      if (error && error.message.includes('rate limit')) {
+        console.log('[v0] Rate limit detected, using admin API...')
+        const adminRes = await fetch('/api/auth/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        
+        if (!adminRes.ok) {
+          const adminError = await adminRes.json()
+          throw new Error(adminError.error || 'Login failed')
+        }
+        
+        const { session } = await adminRes.json()
+        
+        // Set the session in Supabase client
+        if (session) {
+          await supabase.auth.setSession(session)
+          console.log('[v0] Admin login successful')
+          router.push('/')
+        }
+        return
+      }
+      
       if (error) throw error
       
       if (data.session) {

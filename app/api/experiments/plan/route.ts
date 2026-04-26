@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const { experimentId, title, description, hypothesis, methodology } = validatedInput.data;
 
     // Check authentication
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError) {

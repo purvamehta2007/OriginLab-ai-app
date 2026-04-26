@@ -11,10 +11,10 @@ import { ExperimentProgressSchema } from '@/lib/validation';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { experimentId: string } }
+  { params }: { params: Promise<{ experimentId: string }> }
 ) {
   try {
-    const { experimentId } = params;
+    const { experimentId } = await params;
 
     // Validate experiment ID
     if (!experimentId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(experimentId)) {
@@ -40,7 +40,7 @@ export async function PUT(
     }
 
     // Check authentication
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
@@ -138,10 +138,10 @@ export async function PUT(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { experimentId: string } }
+  { params }: { params: Promise<{ experimentId: string }> }
 ) {
   try {
-    const { experimentId } = params;
+    const { experimentId } = await params;
 
     // Validate experiment ID
     if (!experimentId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(experimentId)) {
@@ -149,7 +149,7 @@ export async function GET(
     }
 
     // Check authentication
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError) {

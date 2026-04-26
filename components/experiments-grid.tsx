@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Empty } from '@/components/ui/empty';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { Beaker, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -73,11 +73,17 @@ export function ExperimentsGrid() {
 
   if (experiments.length === 0) {
     return (
-      <Empty
-        icon={Beaker}
-        title="No experiments yet"
-        description="Create your first experiment to get started with AI-powered scientific research"
-      />
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Beaker />
+          </EmptyMedia>
+          <EmptyTitle>No experiments yet</EmptyTitle>
+          <EmptyDescription>
+            Create your first experiment to get started with AI-powered scientific research
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 

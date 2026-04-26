@@ -36,19 +36,28 @@ export default function Page() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-            `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
+      
       if (error) throw error
-      router.push('/auth/sign-up-success')
+      
+      // Check if user needs email confirmation
+      if (data?.user && !data.user.confirmed_at) {
+        // Email verification is required
+        router.push('/auth/sign-up-success?verification=required')
+      } else {
+        // User is immediately confirmed (email verification disabled)
+        router.push('/auth/sign-up-success')
+      }
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred'
+      setError(errorMessage)
+      console.error('[v0] Signup error:', errorMessage)
     } finally {
       setIsLoading(false)
     }

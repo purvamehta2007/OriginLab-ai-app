@@ -29,47 +29,28 @@ export default function Page() {
     setError(null)
 
     try {
-      console.log('[v0] Starting login for:', email)
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Use admin API for login - this works reliably
+      const response = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
       
-      // If standard login fails, use admin API as fallback
-      if (error) {
-        console.log('[v0] Standard login failed:', error.message, '- trying admin API...')
-        
-        const adminRes = await fetch('/api/auth/admin-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        })
-        
-        if (!adminRes.ok) {
-          const adminError = await adminRes.json()
-          throw new Error(adminError.error || 'Invalid credentials')
-        }
-        
-        const { session } = await adminRes.json()
-        
-        // Set the session in Supabase client
-        if (session) {
-          await supabase.auth.setSession(session)
-          console.log('[v0] Admin login successful')
-          router.push('/')
-        }
-        return
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Invalid credentials')
       }
       
-      if (data.session) {
-        console.log('[v0] Login successful')
+      const { session } = await response.json()
+      
+      // Set the session in Supabase client
+      if (session) {
+        await supabase.auth.setSession(session)
         router.push('/')
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred'
       setError(errorMessage)
-      console.error('[v0] Login error:', errorMessage)
     } finally {
       setIsLoading(false)
     }

@@ -35,47 +35,23 @@ export default function Page() {
     }
 
     try {
-      console.log('[v0] Starting signup for:', email)
-      
       // Use admin API for signup - bypasses all Supabase email rate limiting
-      const adminRes = await fetch('/api/auth/admin-signup', {
+      const response = await fetch('/api/auth/admin-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
       
-      if (!adminRes.ok) {
-        const adminError = await adminRes.json()
-        throw new Error(adminError.error || 'Signup failed')
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Signup failed')
       }
       
-      const adminData = await adminRes.json()
-      console.log('[v0] Admin signup successful:', adminData)
-      
-      // Sign in the user after successful signup
-      const supabase = createClient()
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      
-      if (error) {
-        console.warn('[v0] Auto-login after signup failed:', error.message)
-        // Still redirect to success even if auto-login fails
-        router.push('/auth/sign-up-success')
-        return
-      }
-      
-      if (data.session) {
-        console.log('[v0] User signed in after signup')
-        router.push('/')
-      } else {
-        router.push('/auth/sign-up-success')
-      }
+      // Signup successful, redirect to success page
+      router.push('/auth/sign-up-success')
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred'
       setError(errorMessage)
-      console.error('[v0] Signup error:', errorMessage)
     } finally {
       setIsLoading(false)
     }

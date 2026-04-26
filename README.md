@@ -32,16 +32,17 @@ An AI-powered web application for automating scientific experiment design, plann
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Set up environment variables
-cp .env.example .env.local
+cp .env.local.example .env.local
+# Edit .env.local and fill in your Supabase + OpenAI credentials
 
-# Run database migrations (see DEPLOYMENT.md)
-node scripts/setup.mjs
+# Run database schema in your Supabase SQL editor:
+# Copy and run scripts/01_create_schema.sql
 
 # Start development server
-pnpm dev
+npm run dev
 ```
 
 Visit `http://localhost:3000` to see the application.

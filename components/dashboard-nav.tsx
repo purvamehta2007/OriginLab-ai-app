@@ -4,14 +4,16 @@ import { useCallback, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Brain, Beaker, Settings, LogOut, Menu, X } from 'lucide-react';
+import { Brain, Beaker, Settings, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useTheme } from 'next-themes';
 
 export function DashboardNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const handleLogout = useCallback(async () => {
     const supabase = createClient();
@@ -98,8 +100,17 @@ export function DashboardNav() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-sidebar-border text-xs text-sidebar-foreground/60">
-          <p>© 2026 LabGenius AI</p>
+        <div className="p-4 border-t border-sidebar-border flex items-center justify-between">
+          <p className="text-xs text-sidebar-foreground/60">© 2026 LabGenius AI</p>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="h-7 w-7 text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            title="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
         </div>
       </aside>
 
@@ -111,3 +122,4 @@ export function DashboardNav() {
     </>
   );
 }
+

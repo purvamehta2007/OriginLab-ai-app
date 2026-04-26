@@ -132,6 +132,29 @@ CREATE INDEX idx_usage_logs_user_id ON usage_logs(user_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_read ON notifications(read);
 
+-- Auto-create a users row when a new Supabase auth user signs up
+-- Without this, inserting experiments fails with a FK violation because
+-- experiments.user_id references users.id (not auth.users.id directly).
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, created_at, updated_at)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE experiments ENABLE ROW LEVEL SECURITY;

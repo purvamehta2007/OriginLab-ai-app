@@ -174,6 +174,11 @@ CREATE POLICY "Users can update their own profile"
   ON users FOR UPDATE
   USING (auth.uid() = id);
 
+-- Required so the auth trigger (handle_new_user) can create the public.users row on signup
+CREATE POLICY "Allow system to insert user rows"
+  ON users FOR INSERT
+  WITH CHECK (true);
+
 -- RLS Policies for experiments table
 CREATE POLICY "Users can view their own experiments"
   ON experiments FOR SELECT
@@ -233,6 +238,10 @@ CREATE POLICY "Users can manage their own plans"
 
 CREATE POLICY "Users can update their own plans"
   ON experiment_plans FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own plans"
+  ON experiment_plans FOR DELETE
   USING (auth.uid() = user_id);
 
 -- RLS Policies for usage_logs table

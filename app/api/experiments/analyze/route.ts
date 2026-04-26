@@ -1,7 +1,7 @@
-import { streamText, Output } from 'ai';
+import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { createClient } from '@/lib/supabase/server';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   ValidationError,
@@ -27,7 +27,6 @@ const AnalysisSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
     let body;
     try {
       body = await request.json();
@@ -35,7 +34,6 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Invalid JSON in request body');
     }
 
-    // Validate input
     const validatedInput = ExperimentAnalysisSchema.safeParse(body);
     if (!validatedInput.success) {
       const errors = validatedInput.error.errors.map((e) => ({
@@ -45,29 +43,15 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Invalid input', { errors });
     }
 
-    const {
-      experimentId,
-      title,
-      hypothesis,
-      raw_data,
-      processed_data,
-      notes,
-    } = validatedInput.data;
+    const { experimentId, title, hypothesis, raw_data, processed_data, notes } = validatedInput.data;
 
-    // Check authentication
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
-      console.error('[v0] Auth error:', authError);
-      throw new AuthenticationError();
-    }
-
-    if (!user) {
+    if (authError || !user) {
       throw new AuthenticationError('User not authenticated');
     }
 
-    // Verify experiment belongs to user
     const { data: experiment, error: expError } = await supabase
       .from('experiments')
       .select('id, user_id')
@@ -75,7 +59,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (expError) {
-      console.error('[v0] Database error:', expError);
+      console.error('[analyze] Database error:', expError);
       throw new InternalServerError('Failed to fetch experiment');
     }
 
@@ -83,8 +67,7 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError('Experiment not found or unauthorized');
     }
 
-    // Create prompt for AI analysis
-    const prompt = `You are a scientific data analyst. Analyze the following experimental results and provide insights:
+    const prompt = `You are a scientific data analyst. Analyze the following experimental results:
 
 Experiment: ${title}
 Hypothesis: ${hypothesis || 'Not provided'}
@@ -98,27 +81,47 @@ ${JSON.stringify(processed_data || {}, null, 2)}
 Notes: ${notes || 'None provided'}
 
 Provide a comprehensive analysis including:
-1. Summary of findings
-2. Key observations
-3. Statistical insights
-4. Whether the hypothesis is supported
-5. Recommendations for future work
-6. Suggested next steps
-7. Limitations of the study
+1. A clear summary of what the data shows
+2. Key findings from the data
+3. Statistical insights (averages, trends, significant differences)
+4. Whether the data supports the hypothesis and with what confidence
+5. Actionable recommendations based on findings
+6. Suggested next steps for further research
+7. Limitations and potential sources of error
 
-Be thorough, scientific, and practical in your analysis.`;
+Be thorough, scientific, and practical.`;
 
-    const result = await streamText({
+    const result = await generateObject({
       model: openai('gpt-4o'),
+      schema: AnalysisSchema,
       prompt,
-      output: Output.object({
-        schema: AnalysisSchema,
-      }),
-      system: 'You are a scientific data analyst. Provide rigorous, evidence-based analysis. Return valid JSON only.',
+      system: 'You are a scientific data analyst. Provide rigorous, evidence-based analysis. Be specific and quantitative where possible.',
     });
 
-    // Return streaming response
-    return result.toTextStreamResponse();
+    // Persist analysis report to database
+    const { error: reportError } = await supabase.from('analysis_reports').insert({
+      experiment_id: experimentId,
+      user_id: user.id,
+      analysis_type: 'final_analysis',
+      summary: result.object.summary,
+      key_findings: result.object.key_findings,
+      recommendations: result.object.recommendations.join('\n'),
+      confidence_score: result.object.success_metrics.confidence_score,
+    });
+
+    if (reportError) console.error('[analyze] Failed to persist analysis report:', reportError);
+
+    // Update experiment status
+    await supabase
+      .from('experiments')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', experimentId);
+
+    return NextResponse.json(result.object);
   } catch (error) {
     return handleError(error);
   }

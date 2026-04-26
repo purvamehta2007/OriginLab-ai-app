@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader, ArrowLeft } from 'lucide-react';
+import { Loader, ArrowLeft, Beaker, Lightbulb, FlaskConical, BookOpen } from 'lucide-react';
 import Link from 'next/link';
-import { FieldGroup, FieldLabel } from '@/components/ui/field';
 
 export default function NewExperimentPage() {
   const router = useRouter();
@@ -26,19 +25,20 @@ export default function NewExperimentPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      // Validation
       if (!formData.title.trim()) {
         toast.error('Please enter an experiment title');
+        return;
+      }
+
+      if (formData.title.trim().length < 3) {
+        toast.error('Title must be at least 3 characters');
         return;
       }
 
@@ -54,31 +54,30 @@ export default function NewExperimentPage() {
           return;
         }
 
-        // Insert experiment
         const { data: experiment, error } = await supabase
           .from('experiments')
           .insert({
             user_id: user.id,
-            title: formData.title,
-            description: formData.description,
-            hypothesis: formData.hypothesis,
-            methodology: formData.methodology,
+            title: formData.title.trim(),
+            description: formData.description.trim() || null,
+            hypothesis: formData.hypothesis.trim() || null,
+            methodology: formData.methodology.trim() || null,
             status: 'draft',
           })
           .select()
           .single();
 
         if (error) {
-          console.error('[v0] Error creating experiment:', error);
+          console.error('[new-experiment] Error creating experiment:', error);
           toast.error('Failed to create experiment: ' + error.message);
           setLoading(false);
           return;
         }
 
-        toast.success('Experiment created successfully!');
+        toast.success('Experiment created!');
         router.push(`/dashboard/experiment/${experiment.id}`);
       } catch (err: any) {
-        console.error('[v0] Unexpected error:', err);
+        console.error('[new-experiment] Unexpected error:', err);
         toast.error('An unexpected error occurred');
         setLoading(false);
       }
@@ -86,97 +85,125 @@ export default function NewExperimentPage() {
     [formData, router]
   );
 
+  const fields = [
+    {
+      key: 'title' as const,
+      label: 'Experiment Title',
+      required: true,
+      placeholder: 'e.g., Effect of Temperature on Enzyme Activity',
+      icon: <Beaker className="w-3.5 h-3.5" />,
+      type: 'input' as const,
+    },
+    {
+      key: 'hypothesis' as const,
+      label: 'Hypothesis',
+      required: false,
+      placeholder: 'State your hypothesis clearly — what do you expect to find and why?',
+      icon: <Lightbulb className="w-3.5 h-3.5" />,
+      type: 'textarea' as const,
+      rows: 3,
+    },
+    {
+      key: 'description' as const,
+      label: 'Description',
+      required: false,
+      placeholder: 'Brief overview of your experiment and its goals…',
+      icon: <BookOpen className="w-3.5 h-3.5" />,
+      type: 'textarea' as const,
+      rows: 3,
+    },
+    {
+      key: 'methodology' as const,
+      label: 'Methodology',
+      required: false,
+      placeholder: 'Initial thoughts on methodology. AI can help refine and expand on this…',
+      icon: <FlaskConical className="w-3.5 h-3.5" />,
+      type: 'textarea' as const,
+      rows: 3,
+    },
+  ];
+
   return (
-    <div className="p-8 max-w-2xl mx-auto space-y-8">
+    <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/dashboard">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-5 h-5" />
+          <Button variant="ghost" size="icon" className="rounded-full shrink-0">
+            <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Create New Experiment</h1>
-          <p className="text-muted-foreground mt-1">Define your research question and initial parameters</p>
+          <h1 className="text-2xl font-bold text-foreground">Create New Experiment</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Define your research question and initial parameters
+          </p>
         </div>
       </div>
 
       {/* Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Experiment Details</CardTitle>
+      <Card className="border-border/60">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Experiment Details</CardTitle>
           <CardDescription>
-            Start with the basics. You can refine these details later and let AI help with the planning.
+            Start with the basics. AI will help you build out a detailed plan once created.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
-            <FieldGroup>
-              <FieldLabel htmlFor="title">Experiment Title *</FieldLabel>
-              <Input
-                id="title"
-                name="title"
-                placeholder="e.g., Effect of Temperature on Enzyme Activity"
-                value={formData.title}
-                onChange={handleChange}
-                disabled={loading}
-                required
-              />
-            </FieldGroup>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {fields.map((field) => (
+              <div key={field.key} className="space-y-1.5">
+                <label
+                  htmlFor={field.key}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                >
+                  {field.icon}
+                  {field.label}
+                  {field.required && <span className="text-destructive ml-0.5">*</span>}
+                </label>
+                {field.type === 'input' ? (
+                  <Input
+                    id={field.key}
+                    name={field.key}
+                    placeholder={field.placeholder}
+                    value={formData[field.key]}
+                    onChange={handleChange}
+                    disabled={loading}
+                    required={field.required}
+                    className="h-10"
+                  />
+                ) : (
+                  <Textarea
+                    id={field.key}
+                    name={field.key}
+                    placeholder={field.placeholder}
+                    value={formData[field.key]}
+                    onChange={handleChange}
+                    disabled={loading}
+                    rows={field.rows}
+                    className="resize-none"
+                  />
+                )}
+              </div>
+            ))}
 
-            {/* Description */}
-            <FieldGroup>
-              <FieldLabel htmlFor="description">Description</FieldLabel>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Brief overview of your experiment..."
-                value={formData.description}
-                onChange={handleChange}
-                disabled={loading}
-                rows={3}
-              />
-            </FieldGroup>
-
-            {/* Hypothesis */}
-            <FieldGroup>
-              <FieldLabel htmlFor="hypothesis">Hypothesis</FieldLabel>
-              <Textarea
-                id="hypothesis"
-                name="hypothesis"
-                placeholder="State your hypothesis clearly..."
-                value={formData.hypothesis}
-                onChange={handleChange}
-                disabled={loading}
-                rows={3}
-              />
-            </FieldGroup>
-
-            {/* Methodology */}
-            <FieldGroup>
-              <FieldLabel htmlFor="methodology">Methodology (Optional)</FieldLabel>
-              <Textarea
-                id="methodology"
-                name="methodology"
-                placeholder="Initial thoughts on methodology. AI can help refine this..."
-                value={formData.methodology}
-                onChange={handleChange}
-                disabled={loading}
-                rows={3}
-              />
-            </FieldGroup>
-
-            {/* Buttons */}
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="flex gap-3 justify-end pt-2">
               <Link href="/dashboard">
-                <Button variant="outline" type="button">
+                <Button variant="outline" type="button" disabled={loading}>
                   Cancel
                 </Button>
               </Link>
-              <Button type="submit" disabled={loading} className="gap-2">
-                {loading && <Loader className="w-4 h-4 animate-spin" />}
-                Create Experiment
+              <Button type="submit" disabled={loading} className="gap-2 min-w-36">
+                {loading ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  <>
+                    <Beaker className="w-4 h-4" />
+                    Create Experiment
+                  </>
+                )}
               </Button>
             </div>
           </form>

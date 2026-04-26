@@ -1,7 +1,7 @@
-import { streamText, Output } from 'ai';
+import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { createClient } from '@/lib/supabase/server';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   ValidationError,
@@ -29,7 +29,6 @@ const PlanSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
     let body;
     try {
       body = await request.json();
@@ -37,7 +36,6 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Invalid JSON in request body');
     }
 
-    // Validate input
     const validatedInput = ExperimentPlanSchema.safeParse(body);
     if (!validatedInput.success) {
       const errors = validatedInput.error.errors.map((e) => ({
@@ -49,20 +47,13 @@ export async function POST(request: NextRequest) {
 
     const { experimentId, title, description, hypothesis, methodology } = validatedInput.data;
 
-    // Check authentication
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
-      console.error('[v0] Auth error:', authError);
-      throw new AuthenticationError();
-    }
-
-    if (!user) {
+    if (authError || !user) {
       throw new AuthenticationError('User not authenticated');
     }
 
-    // Verify experiment belongs to user
     const { data: experiment, error: expError } = await supabase
       .from('experiments')
       .select('id, user_id')
@@ -70,7 +61,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (expError) {
-      console.error('[v0] Database error:', expError);
+      console.error('[plan] Database error:', expError);
       throw new InternalServerError('Failed to fetch experiment');
     }
 
@@ -78,8 +69,7 @@ export async function POST(request: NextRequest) {
       throw new NotFoundError('Experiment not found or unauthorized');
     }
 
-    // Create prompt for AI
-    const prompt = `You are a scientific research expert. Generate a detailed experimental plan for the following research:
+    const prompt = `You are a scientific research expert. Generate a detailed experimental plan for:
 
 Title: ${title}
 Description: ${description || 'Not provided'}
@@ -87,25 +77,44 @@ Hypothesis: ${hypothesis || 'Not provided'}
 Methodology Notes: ${methodology || 'Not provided'}
 
 Create a structured experimental plan with:
-1. Clear step-by-step procedures
-2. Realistic time estimates for each step
+1. Clear step-by-step procedures (4-8 steps)
+2. Realistic time estimates for each step (in minutes)
 3. Required equipment and resources
-4. Safety considerations
-5. Potential challenges and solutions
+4. Safety considerations specific to this experiment
+5. Practical, actionable instructions`;
 
-Format your response as a detailed JSON plan that can be used to execute the experiment.`;
-
-    const result = await streamText({
+    const result = await generateObject({
       model: openai('gpt-4o'),
+      schema: PlanSchema,
       prompt,
-      output: Output.object({
-        schema: PlanSchema,
-      }),
-      system: 'You are a scientific research expert providing detailed, practical experimental plans. Return valid JSON only.',
+      system: 'You are a scientific research expert providing detailed, practical experimental plans. Be specific and thorough.',
     });
 
-    // Return streaming response
-    return result.toTextStreamResponse();
+    // Persist plan steps to the database
+    const planSteps = result.object.steps.map((step) => ({
+      experiment_id: experimentId,
+      user_id: user.id,
+      step_number: step.step_number,
+      step_title: step.step_title,
+      step_description: step.step_description,
+      expected_duration: step.expected_duration,
+      required_resources: step.required_resources,
+    }));
+
+    await supabase.from('experiment_plans').delete().eq('experiment_id', experimentId);
+
+    if (planSteps.length > 0) {
+      const { error: insertError } = await supabase.from('experiment_plans').insert(planSteps);
+      if (insertError) console.error('[plan] Failed to persist plan steps:', insertError);
+    }
+
+    // Update experiment status to planning
+    await supabase
+      .from('experiments')
+      .update({ status: 'planning', updated_at: new Date().toISOString() })
+      .eq('id', experimentId);
+
+    return NextResponse.json(result.object);
   } catch (error) {
     return handleError(error);
   }
